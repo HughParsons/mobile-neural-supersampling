@@ -1,20 +1,22 @@
 import torch
+import math
+from kornia.metrics import ssim as compute_ssim
 
+def psnr(img1: torch.Tensor, img2: torch.Tensor) -> float:
+    img1 = img1.cpu().detach()
+    img2 = img2.cpu().detach()
 
-def accuracy(output, target):
-    with torch.no_grad():
-        pred = torch.argmax(output, dim=1)
-        assert pred.shape[0] == len(target)
-        correct = 0
-        correct += torch.sum(pred == target).item()
-    return correct / len(target)
+    assert img1.shape == img2.shape
 
+    mse = torch.mean((img1 - img2) ** 2)
+    if mse == 0:
+        return 100
+    
+    return 10 * torch.log10(255.0 / torch.sqrt(mse))
 
-def top_k_acc(output, target, k=3):
-    with torch.no_grad():
-        pred = torch.topk(output, k, dim=1)[1]
-        assert pred.shape[0] == len(target)
-        correct = 0
-        for i in range(k):
-            correct += torch.sum(pred[:, i] == target).item()
-    return correct / len(target)
+def ssim(img1: torch.Tensor, img2: torch.Tensor) -> float:
+    img1 = img1.cpu().detach()
+    img2 = img2.cpu().detach()
+    assert img1.shape == img2.shape
+
+    return torch.mean(compute_ssim(img1, img2, 11))

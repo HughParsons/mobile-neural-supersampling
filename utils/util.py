@@ -4,7 +4,27 @@ import pandas as pd
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+import torch.nn.functional as F
 
+def warp(tensor: torch.Tensor, motion: torch.Tensor):
+    B, _, H, W = tensor.size()
+    # Construct a grid of relative pixel positions [-1,1] = [left, right] = [top, bottom]
+    xx = torch.linspace(-1, 1, W, device=tensor.device).view(1,-1).repeat(H,1)
+    yy = torch.linspace(-1, 1, H, device=tensor.device).view(-1,1).repeat(1,W)
+
+    xx = xx.view(1,1,H,W).repeat(B,1,1,1)
+    yy = yy.view(1,1,H,W).repeat(B,1,1,1)
+
+    grid = torch.cat((xx, yy),1)
+    # We use HDRP motion vectors which measure the forward movement of pixels
+    # measured relative to the frame, i.e. -1 means the pixel moved to the left 
+    # of the frame from the right. However, we invert these in the data loader.
+    #
+    # To get the pixel in the previous frame that we are sampling from we add 
+    # motion vector from the grid of relative pixel positions
+    vgrid = grid + motion
+
+    return F.grid_sample(tensor, vgrid.permute(0, 2, 3, 1).to(tensor.dtype), mode="bilinear", align_corners=True)
 
 def ensure_dir(dirname):
     dirname = Path(dirname)
